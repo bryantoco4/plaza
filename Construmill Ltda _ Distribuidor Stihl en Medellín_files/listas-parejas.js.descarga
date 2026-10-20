@@ -1,0 +1,83 @@
+/**
+ * Listas de productos lado a lado (widget "TF Product Multi" del tema, en columnas
+ * de una misma sección de Elementor, p. ej. "Top 20 / Destacados / Más vendidos / Ofertas").
+ *
+ * - Muestra como máximo N productos por lista (ohcListas.max).
+ * - Fotos cuadradas y todos los productos de la misma altura, para que las filas
+ *   queden alineadas entre columnas. En celular (columnas apiladas) solo se limita
+ *   la cantidad.
+ */
+(function () {
+	'use strict';
+
+	var cfg = window.ohcListas || {};
+	var MAX = parseInt(cfg.max, 10) || 0;
+
+	function itemsOf(list) {
+		return Array.prototype.filter.call(list.children, function (el) {
+			return el.classList.contains('item');
+		});
+	}
+
+	// Agrupa las listas por la fila de Elementor que las contiene.
+	function groups() {
+		var map = new Map();
+		document.querySelectorAll('.tf-products.multirow.no-carousel').forEach(function (list) {
+			var row = list.closest('.elementor-container');
+			if (!row) {
+				var col = list.closest('.e-con');
+				row = col && col.parentElement ? col.parentElement.closest('.e-con') : null;
+			}
+			if (!row) return;
+			if (!map.has(row)) map.set(row, []);
+			map.get(row).push(list);
+		});
+		var out = [];
+		map.forEach(function (lists) {
+			if (lists.length >= 2) out.push(lists);
+		});
+		return out;
+	}
+
+	function apply() {
+		groups().forEach(function (lists) {
+			var visible = [];
+			lists.forEach(function (list) {
+				list.classList.add('ohc-even');
+				itemsOf(list).forEach(function (item, i) {
+					var hide = MAX > 0 && i >= MAX;
+					item.classList.toggle('ohc-list-hide', hide);
+					item.style.minHeight = '';
+					if (!hide) visible.push(item);
+				});
+			});
+
+			// Solo se igualan alturas si las listas están una al lado de la otra.
+			var tops = lists.map(function (l) { return Math.round(l.getBoundingClientRect().top); });
+			var sideBySide = Math.max.apply(null, tops) - Math.min.apply(null, tops) < 5;
+			if (!sideBySide || !visible.length) return;
+
+			var tallest = 0;
+			visible.forEach(function (item) {
+				tallest = Math.max(tallest, item.getBoundingClientRect().height);
+			});
+			visible.forEach(function (item) {
+				item.style.minHeight = Math.ceil(tallest) + 'px';
+			});
+		});
+	}
+
+	var timer;
+	function schedule() {
+		clearTimeout(timer);
+		timer = setTimeout(apply, 150);
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', apply);
+	} else {
+		apply();
+	}
+	window.addEventListener('load', apply);      // cuando ya cargaron las fotos
+	window.addEventListener('resize', schedule);
+})();
